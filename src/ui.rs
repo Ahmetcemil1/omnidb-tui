@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::app::{App, ViewMode};
+use crate::db::DbType;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.size();
@@ -112,11 +113,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             .collect()
     };
 
+    let sidebar_title = if active_tab.db_type == DbType::Solana {
+        " 📁 RPC Categories "
+    } else {
+        " 📁 Tables "
+    };
+
     let sidebar_paragraph = Paragraph::new(tables_items).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(sidebar_border_color))
-            .title(" 📁 Tables "),
+            .title(sidebar_title),
     );
     f.render_widget(sidebar_paragraph, main_layout[0]);
 
@@ -137,11 +144,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Color::DarkGray
     };
 
+    let query_title = if active_tab.db_type == DbType::Solana {
+        " 📝 Solana Command Editor "
+    } else {
+        " 📝 SQL Query Editor "
+    };
+
     let query_paragraph = Paragraph::new(active_tab.query_editor_content.as_str()).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(query_border_color))
-            .title(" 📝 SQL Query Editor "),
+            .title(query_title),
     );
     f.render_widget(query_paragraph, right_chunks[0]);
 

@@ -97,6 +97,7 @@ async fn connect_database(
             DbType::Postgres => 5432,
             DbType::MySql => 3306,
             DbType::Sqlite => 0,
+            DbType::Solana => 8899,
         };
         let (db_host, db_port) = bookmarks::parse_host_port_from_uri(&uri, default_port);
 
@@ -126,6 +127,58 @@ async fn connect_database(
                 return;
             }
         }
+    }
+
+    if db_type == DbType::Solana {
+        let url = if uri.starts_with("solana://") {
+            let host = &uri[9..];
+            if host == "localhost" || host.starts_with("localhost:") || host.starts_with("127.0.0.1") {
+                format!("http://{}", host)
+            } else {
+                format!("https://{}", host)
+            }
+        } else {
+            uri.clone()
+        };
+        
+        let client = reqwest::Client::new();
+        let health_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getHealth"
+        });
+        
+        let is_healthy = match client.post(&url).json(&health_req).send().await {
+            Ok(res) => res.status().is_success(),
+            Err(_) => false,
+        };
+        
+        if is_healthy {
+            sqlx::any::install_default_drivers();
+            let pool = sqlx::any::AnyPoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:")
+                .await
+                .unwrap();
+            let tables = vec![
+                "Account Info".to_string(),
+                "Recent Transactions".to_string(),
+                "Borsh IDL Parser".to_string()
+            ];
+            let _ = tx.send(AppEvent::DbConnected {
+                tab_idx,
+                pool,
+                tables,
+                ssh_child: None,
+                ssh_port: None,
+            }).await;
+        } else {
+            let _ = tx.send(AppEvent::DbConnectionFailed {
+                tab_idx,
+                error: "Failed to connect to Solana RPC endpoint: Connection refused or host unreachable".to_string()
+            }).await;
+        }
+        return;
     }
 
     match db::connect(&uri).await {
@@ -160,6 +213,17 @@ async fn connect_database(
 /// Helper function to run query in the background
 async fn run_query(tab_idx: usize, pool: sqlx::AnyPool, sql: String, tx: Sender<AppEvent>) {
     match db::execute_query(&pool, &sql).await {
+        Ok((headers, rows)) => {
+            let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
+        }
+        Err(e) => {
+            let _ = tx.send(AppEvent::QueryFailed { tab_idx, error: e.to_string() }).await;
+        }
+    }
+}
+
+async fn run_solana_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
+    match db::execute_solana_command(&uri, &command).await {
         Ok((headers, rows)) => {
             let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
         }
@@ -698,6 +762,7 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                         DbType::Postgres => "Custom PostgreSQL",
                         DbType::MySql => "Custom MySQL",
                         DbType::Sqlite => "Custom SQLite",
+                        DbType::Solana => "Custom Solana RPC",
                     };
 
                     let new_idx = app.tabs.len();
@@ -795,16 +860,20 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
     {
         let tab = &mut app.tabs[tab_idx];
         if matches!(tab.selected_view, ViewMode::Query) {
-            if let Some(pool) = &tab.connection_pool {
-                let sql = tab.query_editor_content.clone();
-                if !sql.trim().is_empty() {
-                    app.pending_query = true;
-                    // Save query to local history file and app state
-                    log_history(&sql);
-                    app.query_history.push(sql.replace('\n', " "));
-                    
+            let sql = tab.query_editor_content.clone();
+            if !sql.trim().is_empty() {
+                app.pending_query = true;
+                log_history(&sql);
+                app.query_history.push(sql.replace('\n', " "));
+                
+                if tab.db_type == DbType::Solana {
+                    let uri_clone = tab.connection_uri.clone();
+                    tokio::spawn(run_solana_query(tab_idx, uri_clone, sql, tx.clone()));
+                } else if let Some(pool) = &tab.connection_pool {
                     let pool_clone = pool.clone();
                     tokio::spawn(run_query(tab_idx, pool_clone, sql, tx.clone()));
+                } else {
+                    app.pending_query = false;
                 }
             }
         }
@@ -1016,7 +1085,16 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
             match tab.selected_view {
                 ViewMode::Tables => {
                     if let Some(ref table) = tab.active_table {
-                        if let Some(pool) = &tab.connection_pool {
+                        if tab.db_type == DbType::Solana {
+                            let template = match table.as_str() {
+                                "Account Info" => "vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR".to_string(),
+                                "Recent Transactions" => "history vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR".to_string(),
+                                "Borsh IDL Parser" => "idl ./path_to_idl.json vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR MyAccountStruct".to_string(),
+                                _ => "".to_string(),
+                            };
+                            tab.query_editor_content = template;
+                            tab.selected_view = ViewMode::Query;
+                        } else if let Some(pool) = &tab.connection_pool {
                             app.pending_query = true;
                             let sql = format!("SELECT * FROM {} LIMIT 500;", table);
                             tab.query_editor_content = sql.clone();
