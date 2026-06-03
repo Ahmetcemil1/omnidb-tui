@@ -13,6 +13,8 @@
 OmniDB TUI is a blazingly fast terminal user interface (TUI) for managing databases. Designed for power users who demand native performance, it completely eliminates the need for resource-heavy Electron or JVM apps. With built-in SSH tunneling, offline AI SQL assistance (Ollama), and full Vim-keybindings, it brings modern database management directly to your terminal.
 <br>
 
+[![asciicast](https://asciinema.org/a/lWEcQyMaE2otxIYK.svg)](https://asciinema.org/a/lWEcQyMaE2otxIYK)
+
 </div>
 
 ---
