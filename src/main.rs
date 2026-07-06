@@ -14,6 +14,7 @@ mod db;
 mod ai;
 mod ui;
 mod bookmarks;
+mod solana;
 
 use app::{App, AppEvent, ViewMode, log_history};
 use db::DbType;
@@ -223,7 +224,7 @@ async fn run_query(tab_idx: usize, pool: sqlx::AnyPool, sql: String, tx: Sender<
 }
 
 async fn run_solana_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
-    match db::execute_solana_command(&uri, &command).await {
+    match solana::execute_solana_command(&uri, &command).await {
         Ok((headers, rows)) => {
             let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
         }
