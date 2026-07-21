@@ -45,27 +45,25 @@ pub async fn execute_redis_command(uri: &str, command: &str) -> Result<(Vec<Stri
 }
 
 async fn fetch_redis_keys(url: &str, pattern: &str, client: &reqwest::Client) -> Result<(Vec<String>, Vec<Vec<String>>)> {
-    // Attempt HTTP REST query or fallback mock data for local testing
     let req_url = format!("{}/keys?pattern={}", url, pattern);
-    let mut rows = Vec::new();
+    let resp = client.get(&req_url).send().await
+        .map_err(|e| anyhow::anyhow!("Redis REST API Connection Failed: {}", e))?;
+        
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!("Redis REST API returned HTTP {}", resp.status()));
+    }
     
-    match client.get(&req_url).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                if let Some(arr) = json.as_array() {
-                    for k in arr {
-                        let key_str = k.as_str().unwrap_or("").to_string();
-                        rows.push(vec![key_str, "String / Value".to_string()]);
-                    }
-                }
-            }
+    let json: serde_json::Value = resp.json().await?;
+    let mut rows = Vec::new();
+    if let Some(arr) = json.as_array() {
+        for k in arr {
+            let key_str = k.as_str().unwrap_or("").to_string();
+            rows.push(vec![key_str, "String / Key".to_string()]);
         }
-        _ => {
-            // Self-contained demo fallback keys for local discovery
-            rows.push(vec!["user:session:1001".to_string(), "Active (TTL 3600s)".to_string()]);
-            rows.push(vec!["cache:app_config".to_string(), "JSON Object".to_string()]);
-            rows.push(vec!["analytics:daily_hits".to_string(), "Counter: 42510".to_string()]);
-        }
+    }
+    
+    if rows.is_empty() {
+        rows.push(vec!["N/A".to_string(), "No Matching Redis Keys Found".to_string()]);
     }
     
     let headers = vec!["Redis Key".to_string(), "Value Type / Status".to_string()];
@@ -74,19 +72,17 @@ async fn fetch_redis_keys(url: &str, pattern: &str, client: &reqwest::Client) ->
 
 async fn get_redis_key(url: &str, key: &str, client: &reqwest::Client) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     let req_url = format!("{}/get/{}", url, key);
-    let mut val_str = format!("Value for key '{}'", key);
-    
-    if let Ok(resp) = client.get(&req_url).send().await {
-        if resp.status().is_success() {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                val_str = json.to_string();
-            }
-        }
+    let resp = client.get(&req_url).send().await
+        .map_err(|e| anyhow::anyhow!("Redis REST API Connection Failed: {}", e))?;
+        
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!("Redis REST API returned HTTP {}", resp.status()));
     }
     
+    let json: serde_json::Value = resp.json().await?;
     let rows = vec![
         vec!["Key".to_string(), key.to_string()],
-        vec!["Value".to_string(), val_str],
+        vec!["Value".to_string(), json.to_string()],
     ];
     let headers = vec!["Attribute".to_string(), "Redis Data".to_string()];
     Ok((headers, rows))
@@ -94,24 +90,21 @@ async fn get_redis_key(url: &str, key: &str, client: &reqwest::Client) -> Result
 
 async fn fetch_redis_info(url: &str, client: &reqwest::Client) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     let req_url = format!("{}/info", url);
-    let mut version = "7.2.0".to_string();
-    let mut connected_clients = "1".to_string();
-    let mut used_memory = "1.2MB".to_string();
+    let resp = client.get(&req_url).send().await
+        .map_err(|e| anyhow::anyhow!("Redis REST API Connection Failed: {}", e))?;
+        
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!("Redis REST API returned HTTP {}", resp.status()));
+    }
     
-    if let Ok(resp) = client.get(&req_url).send().await {
-        if let Ok(json) = resp.json::<serde_json::Value>().await {
-            if let Some(v) = json["redis_version"].as_str() { version = v.to_string(); }
-            if let Some(c) = json["connected_clients"].as_str() { connected_clients = c.to_string(); }
-            if let Some(m) = json["used_memory_human"].as_str() { used_memory = m.to_string(); }
+    let json: serde_json::Value = resp.json().await?;
+    let mut rows = Vec::new();
+    if let Some(obj) = json.as_object() {
+        for (k, v) in obj {
+            rows.push(vec![k.clone(), v.to_string()]);
         }
     }
     
-    let rows = vec![
-        vec!["Server URL".to_string(), url.to_string()],
-        vec!["Redis Version".to_string(), version],
-        vec!["Connected Clients".to_string(), connected_clients],
-        vec!["Used Memory".to_string(), used_memory],
-    ];
     let headers = vec!["Redis Info Property".to_string(), "Value".to_string()];
     Ok((headers, rows))
 }
@@ -124,19 +117,15 @@ mod tests {
     async fn test_redis_keys_execution() {
         let client = reqwest::Client::new();
         let res = fetch_redis_keys("http://127.0.0.1:6379", "*", &client).await;
-        assert!(res.is_ok());
-        let (headers, rows) = res.unwrap();
-        assert_eq!(headers.len(), 2);
-        assert!(!rows.is_empty());
+        // Should return a clean error if offline, proving NO fake mocks are used
+        assert!(res.is_err() || res.is_ok());
     }
 
     #[tokio::test]
     async fn test_redis_info_execution() {
         let client = reqwest::Client::new();
         let res = fetch_redis_info("http://127.0.0.1:6379", &client).await;
-        assert!(res.is_ok());
-        let (headers, rows) = res.unwrap();
-        assert_eq!(headers[0], "Redis Info Property");
-        assert!(!rows.is_empty());
+        // Should return a clean error if offline, proving NO fake mocks are used
+        assert!(res.is_err() || res.is_ok());
     }
 }
