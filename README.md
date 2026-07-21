@@ -2,18 +2,19 @@
 
 # 🚀 OmniDB TUI
 
-**The Ultimate AI-Powered Multi-Database Client & Solana Terminal Developer Workspace**
+### *The Zero-Latency Multi-Database Client & Solana Developer Terminal Workspace*
 
-[![Rust](https://img.shields.io/badge/Language-Rust-orange.svg)](https://www.rust-lang.org/)
-[![Solana](https://img.shields.io/badge/Solana-Devnet%20%7C%20Mainnet-purple.svg)](https://solana.com/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
+[![Rust](https://img.shields.io/badge/Language-Rust-orange.svg?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+[![Solana](https://img.shields.io/badge/Solana-Devnet%20%7C%20Mainnet-purple.svg?style=for-the-badge&logo=solana)](https://solana.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg?style=for-the-badge)]()
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)]()
 
 <br>
 
-**OmniDB TUI** is a blazingly fast, zero-latency terminal user interface (TUI) for managing **PostgreSQL, MySQL, SQLite, Redis, MongoDB, and Solana RPC networks**. 
+**OmniDB TUI** is an ultra-fast, keyboard-driven terminal workspace designed to unify traditional relational databases, NoSQL document/key-value stores, and Web3 blockchain nodes into a single, zero-latency interface.
 
-Built for developers who demand native performance without memory-heavy Electron apps, it features built-in SSH tunneling, offline local AI assistance (Ollama), Anchor IDL decoders, transaction simulators, and full Vim keybindings.
+Built 100% in Rust with `ratatui` and `tokio`, it eliminates memory-heavy Electron apps while giving developers instant access to **PostgreSQL, MySQL, SQLite, Redis, MongoDB, and Solana RPC networks**.
 
 <br>
 
@@ -21,42 +22,68 @@ Built for developers who demand native performance without memory-heavy Electron
 
 ---
 
-## 🌟 Supported Platform Engines
+## 🏗️ High-Level Architecture Diagram
 
-| Platform | URI Protocol Format | Supported Features |
+```mermaid
+graph TD
+    A[Terminal User Interface - Ratatui / Crossterm] --> B[Async Event Loop - Tokio & MPSC Channel]
+    
+    subgraph Multi-Database Engine Core
+        B --> C[SQL Driver Core: SQLx - Postgres / MySQL / SQLite]
+        B --> D[Solana RPC Client: Anchor IDL & Borsh Decoder]
+        B --> E[NoSQL Redis Client: Key-Value & Cluster Info]
+        B --> F[NoSQL MongoDB Client: BSON / JSON Collections]
+    end
+
+    subgraph Intelligence & Tunneling Layer
+        B --> G[Local AI Assistant: Ollama REST API - qwen2.5-coder / llama3]
+        B --> H[SSH Bastion Tunneling Engine: Native Port Forwarding]
+    end
+```
+
+---
+
+## 🌟 Supported Database & Blockchain Platforms
+
+| Engine | Protocol Format | Supported Features |
 | :--- | :--- | :--- |
-| **PostgreSQL** | `postgres://user:pass@host:5432/db` | Schema introspection, SQL editor, fuzzy search, inline cell edit |
-| **MySQL** | `mysql://user:pass@host:3306/db` | Full DDL/DML, dynamic schema viewer, query history |
-| **SQLite** | `sqlite://local.db` | Embedded file DBs, in-memory execution, schema export |
-| **Solana RPC** | `solana://api.devnet.solana.com` | Anchor IDL decode, `simulateTransaction`, CU meter, `diff`, Metaplex NFT decoder, SPL tokens, `solana-test-validator` control |
-| **Redis** | `redis://host:6379` | Key-Value reader, `KEYS *`, `GET <key>`, `INFO` cluster metrics |
-| **MongoDB** | `mongodb://host:27017` | BSON / JSON document collection viewer, `find <coll>`, database stats |
+| 🐘 **PostgreSQL** | `postgres://user:pass@host:5432/db` | Schema introspection, full DDL/DML, fuzzy search filter, inline cell editing |
+| 🐬 **MySQL** | `mysql://user:pass@host:3306/db` | Dynamic schema navigation, query history logging, export to CSV/JSON/MD |
+| 📁 **SQLite** | `sqlite://local.db` | Embedded local file DBs, in-memory execution, schema export |
+| ⚡ **Redis** | `redis://host:6379` | Key-Value explorer, `KEYS *` pattern search, `GET <key>`, `INFO` memory metrics |
+| 🍃 **MongoDB** | `mongodb://host:27017` | BSON / JSON document collection viewer, `find <coll>`, database cluster stats |
+| 🟣 **Solana RPC** | `solana://api.devnet.solana.com` | Anchor IDL decode, `simulateTransaction` CU budget meter, `diff` state viewer, `nft` Metaplex decoder, `tokens` portfolio, `solana-test-validator` manager |
 
 ---
 
-## ⚡ Key Features
+## 🚀 Solana Smart Contract (Anchor) Developer Suite
 
-### 🚀 Solana Smart Contract (Anchor) Developer Suite
-- 📜 **Anchor IDL Borsh Decoder (`idl`):** Decode raw Base64 account data into human-readable tables using local `idl.json` schemas.
-- ⚡ **Compute Unit (CU) Meter & Pre-flight Simulator (`simulate`):** Run `simulateTransaction` and render visual progress meters for CU budget consumption (200,000 max CU).
-- 🔍 **Account State Diff Viewer (`diff`):** Compare pre-transaction vs. post-transaction SOL balances and token states side-by-side with color-coded diffs.
-- 🛠️ **Client Code Generator (`code`):** Generate 100% production-ready TypeScript (`@coral-xyz/anchor`) and Rust (`anchor_client`) snippets for any Anchor struct.
-- 🎨 **Metaplex NFT & SPL Token Decoder (`nft` & `tokens`):** Resolve SPL token balances and Metaplex on-chain NFT metadata.
-- 💻 **Integrated Validator Controller (`validator`):** Spawn, stop, reset `solana-test-validator`, and request local SOL airdrops directly inside TUI.
+OmniDB TUI transforms your terminal into a complete **Solana Developer Workspace**:
 
-### 🤖 Local AI Assistant (Ollama)
-- 🧠 **Natural Language to SQL (`Ctrl + Space`):** Convert English to SQL using local Ollama models (e.g., `qwen2.5-coder`, `llama3`).
-- ⚡ **AI Query Explainer & Optimizer (`Ctrl + E`):** Analyze slow SQL queries and get index optimization advice.
-- 🛠️ **AI Solana Transaction Error Diagnoser:** Send transaction failure logs to local AI to get plain-English root cause explanations and Anchor constraint fixes.
-- 📋 **AI IDL Architecture Summarizer (`idl-summary`):** Summarize complex Anchor IDLs into structured executive documentation.
+- 📜 **Anchor IDL Borsh Account Decoder (`idl`):** Read raw Base64 account data on-chain and deserialize it into clean, structured TUI tables using local `idl.json` schemas.
+- ⚡ **Compute Unit (CU) Budget Meter & Pre-Flight Simulator (`simulate`):** Run `simulateTransaction` before broadcast and render a visual progress bar indicating Compute Units consumed vs. maximum budget limit (200,000 max CU).
+- 🔍 **Account State Diff Viewer (`diff`):** Inspect pre-transaction vs. post-transaction account state, showing color-coded SOL balance diffs (`🟩 +0.050 SOL`, `🟥 -0.005 SOL`).
+- 🛠️ **Anchor Client Code Generator (`code`):** Generate 100% production-ready TypeScript (`@coral-xyz/anchor`) and Rust (`anchor_client`) client code snippets for any Anchor struct.
+- 🎨 **Metaplex NFT & SPL Token Visualizer (`nft` & `tokens`):** Query SPL token balances and Metaplex on-chain NFT metadata (supply, decimals, non-fungible status).
+- 💻 **Integrated Validator Controller (`validator`):** Spawn, stop, reset `solana-test-validator`, check node health, and request test SOL airdrops directly inside TUI.
+- 📋 **Local IDL Architecture Summarizer (`idl-summary`):** Generate human-readable architectural summaries of Anchor instructions, structs, and account constraints.
 
 ---
 
-## ⚙️ Usage & Solana Commands
+## 🤖 Local AI Assistant (Ollama Enriched)
 
-Run `omnidb-tui` and open a new connection tab (`Ctrl + N`).
+OmniDB TUI integrates directly with local **Ollama** LLMs (e.g., `qwen2.5-coder:14b`, `llama3`), ensuring 100% privacy with **zero cloud dependencies**:
 
-### Solana Commands Reference
+- 🧠 **Natural Language to SQL (`Ctrl + Space`):** Type English requests (e.g. *"Show top 5 active users by transaction count"*) and get valid, schema-aware raw SQL.
+- ⚡ **AI Query Explainer & Optimizer (`Ctrl + E`):** Highlight slow SQL queries to get instant performance analysis, bottleneck warnings, and index suggestions.
+- 🛠️ **AI Solana Transaction Error Diagnoser:** Send raw transaction error traces and logs to local AI to receive plain-English root cause explanations and Anchor constraint code fixes.
+- 🔒 **100% Private & Free:** Runs on `http://localhost:11434`. No API keys required, zero data leaves your local machine.
+
+---
+
+## ⚙️ Solana Terminal Commands Quick Reference
+
+Run `omnidb-tui` and open a Solana connection tab (`Ctrl + N` -> `solana://api.devnet.solana.com`).
 
 ```text
 vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR               Fetch SOL balance, owner program, and data
@@ -75,25 +102,30 @@ idl-summary <idl_path>                                    Summarize Anchor IDL a
 
 ## 🎮 Keyboard Shortcuts
 
+OmniDB TUI is engineered for keyboard-driven efficiency with full Vim support.
+
 | Keybinding | Action |
 | :--- | :--- |
-| **`Ctrl + Space`** | Open AI Text-to-SQL Assistant |
-| **`Ctrl + E`** | AI Explain & Optimize SQL Query |
-| **`Ctrl + H`** | View Query History |
-| **`Ctrl + N`** | Open New Connection Tab |
-| **`Ctrl + X`** | Export Data Grid (CSV / JSON / Markdown) |
-| **`h`, `j`, `k`, `l`** | Vim Navigation (Left, Down, Up, Right) |
-| **`gg` / `G`** | Jump to Top / Bottom |
-| **`/`** | Fuzzy Search Filter Data Grid |
-| **`i`** | Inline Cell Edit Mode |
-| **`Enter`** | Execute Query / Select Item |
-| **`Esc` / `q`** | Close Modal / Quit Application |
+| **`Ctrl + Space`** | Open AI Text-to-SQL Assistant Modal |
+| **`Ctrl + E`** | AI Explain & Optimize Current SQL Query |
+| **`Ctrl + H`** | Open Query History Modal |
+| **`Ctrl + N`** | Open Connection Modal / New Tab |
+| **`Ctrl + X`** | Open Data Grid Export Modal (CSV / JSON / Markdown) |
+| **`h`, `j`, `k`, `l`** | Vim-style Navigation (Left, Down, Up, Right) |
+| **`gg` / `G`** | Jump to Top / Bottom of List |
+| **`/`** | Activate Fuzzy Search Filter Mode on Data Grid |
+| **`i`** | Activate Inline Cell Editing Mode |
+| **`Tab` / `BackTab`** | Switch Active Connection Tab |
+| **`Enter`** | Execute Selected Query / Confirm Action |
+| **`Esc` / `q`** | Close Active Modal / Quit Application |
 
 ---
 
-## 🏗️ Getting Started & Installation
+## 💻 Installation & Quick Start
 
 ### Build from Source
+
+Ensure you have Rust (v1.75+) installed:
 
 ```bash
 git clone https://github.com/Ahmetcemil1/omnidb-tui.git
@@ -102,16 +134,26 @@ cargo build --release
 sudo mv target/release/omnidb-tui /usr/local/bin/
 ```
 
-### Local AI Prerequisites (Optional)
+### Run Application
+
+```bash
+omnidb-tui
+```
+
+### Local AI Setup (Optional)
+
 Install and run [Ollama](https://ollama.com/):
+
 ```bash
 ollama serve
-ollama pull qwen2.5-coder
+ollama pull qwen2.5-coder:14b
 ```
-OmniDB TUI automatically detects the local Ollama API on `http://localhost:11434`.
+OmniDB TUI automatically detects the running Ollama model on `http://localhost:11434`.
 
 ---
 
-## 📜 License
+## 📜 License & Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
+
+Built with ❤️ for the **Solana Colosseum Hackathon** using [Ratatui](https://github.com/ratatui/ratatui) and [SQLx](https://github.com/launchbadge/sqlx).
