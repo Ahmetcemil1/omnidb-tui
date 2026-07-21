@@ -57,13 +57,19 @@ async fn main() -> Result<()> {
             Some(event) = rx.recv() => {
                 handle_app_event(&mut app, event);
             }
-            // Poll for terminal keyboard input events
+            // Poll for terminal keyboard input and window resize events
             _ = tokio::time::sleep(Duration::from_millis(15)) => {
                 if event::poll(Duration::ZERO)? {
-                    if let Event::Key(key) = event::read()? {
-                        if handle_key_input(&mut app, key, tx.clone()).await? {
-                            should_exit = true;
+                    match event::read()? {
+                        Event::Key(key) => {
+                            if handle_key_input(&mut app, key, tx.clone()).await? {
+                                should_exit = true;
+                            }
                         }
+                        Event::Resize(_, _) => {
+                            terminal.clear()?;
+                        }
+                        _ => {}
                     }
                 }
             }
