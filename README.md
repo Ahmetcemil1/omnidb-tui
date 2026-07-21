@@ -2,128 +2,115 @@
 
 # 🚀 OmniDB TUI
 
-**The Ultimate, AI-Powered, Zero-Latency Terminal Database Client**
+**The Ultimate AI-Powered Multi-Database Client & Solana Terminal Developer Workspace**
 
 [![Rust](https://img.shields.io/badge/Language-Rust-orange.svg)](https://www.rust-lang.org/)
+[![Solana](https://img.shields.io/badge/Solana-Devnet%20%7C%20Mainnet-purple.svg)](https://solana.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
 <br>
-OmniDB TUI is a blazingly fast terminal user interface (TUI) for managing databases. Designed for power users who demand native performance, it completely eliminates the need for resource-heavy Electron or JVM apps. With built-in SSH tunneling, offline AI SQL assistance (Ollama), and full Vim-keybindings, it brings modern database management directly to your terminal.
-<br>
 
-[![asciicast](https://asciinema.org/a/lWEcQyMaE2otxIYK.svg)](https://asciinema.org/a/lWEcQyMaE2otxIYK)
+**OmniDB TUI** is a blazingly fast, zero-latency terminal user interface (TUI) for managing **PostgreSQL, MySQL, SQLite, Redis, MongoDB, and Solana RPC networks**. 
+
+Built for developers who demand native performance without memory-heavy Electron apps, it features built-in SSH tunneling, offline local AI assistance (Ollama), Anchor IDL decoders, transaction simulators, and full Vim keybindings.
+
+<br>
 
 </div>
 
 ---
 
-## 🌟 Why OmniDB TUI?
+## 🌟 Supported Platform Engines
 
-Traditional database clients consume gigabytes of RAM and force you to break your terminal workflow. OmniDB TUI is built with **Rust** and **Ratatui** to provide an instant, zero-latency interface. 
-
-### ✨ Core Features
-
-- 🦀 **Native & Blazingly Fast:** Written in 100% Rust. Starts instantly, consumes minimal memory, and renders thousands of rows without stuttering.
-- 🤖 **Local AI SQL Assistant:** Generate complex SQL queries using plain English (`Ctrl + Space`). Powered by your local Ollama models (e.g., Llama 3) ensuring your database schemas never leave your machine!
-- 🧠 **AI Query Explainer & Optimizer:** Highlight a slow query, press `Ctrl + E`, and let the local AI explain the execution plan or suggest indexes.
-- 🚇 **Built-in SSH Tunneling:** Connect securely to production databases hidden behind bastions. No need for separate CLI background processes; OmniDB handles the tunneling natively.
-- ⌨️ **Vim Navigations:** Full support for `h`, `j`, `k`, `l`, `gg`, `G`. Real developers don't touch the mouse.
-- ⚡ **Multi-Tab Asynchronous Architecture:** Powered by `Tokio`. Run a 5-minute aggregation query in one tab while managing a completely different database in another tab without UI freezing.
-- 📑 **Query History & Secure Bookmarks:** Press `Ctrl+H` for query history. Save long, complex connection strings securely as local bookmarks.
-- 📦 **Data Export:** Export query results directly to CSV, JSON, or GitHub-flavored Markdown.
+| Platform | URI Protocol Format | Supported Features |
+| :--- | :--- | :--- |
+| **PostgreSQL** | `postgres://user:pass@host:5432/db` | Schema introspection, SQL editor, fuzzy search, inline cell edit |
+| **MySQL** | `mysql://user:pass@host:3306/db` | Full DDL/DML, dynamic schema viewer, query history |
+| **SQLite** | `sqlite://local.db` | Embedded file DBs, in-memory execution, schema export |
+| **Solana RPC** | `solana://api.devnet.solana.com` | Anchor IDL decode, `simulateTransaction`, CU meter, `diff`, Metaplex NFT decoder, SPL tokens, `solana-test-validator` control |
+| **Redis** | `redis://host:6379` | Key-Value reader, `KEYS *`, `GET <key>`, `INFO` cluster metrics |
+| **MongoDB** | `mongodb://host:27017` | BSON / JSON document collection viewer, `find <coll>`, database stats |
 
 ---
 
-## 🚀 Getting Started
+## ⚡ Key Features
 
-### Prerequisites
+### 🚀 Solana Smart Contract (Anchor) Developer Suite
+- 📜 **Anchor IDL Borsh Decoder (`idl`):** Decode raw Base64 account data into human-readable tables using local `idl.json` schemas.
+- ⚡ **Compute Unit (CU) Meter & Pre-flight Simulator (`simulate`):** Run `simulateTransaction` and render visual progress meters for CU budget consumption (200,000 max CU).
+- 🔍 **Account State Diff Viewer (`diff`):** Compare pre-transaction vs. post-transaction SOL balances and token states side-by-side with color-coded diffs.
+- 🛠️ **Client Code Generator (`code`):** Generate 100% production-ready TypeScript (`@coral-xyz/anchor`) and Rust (`anchor_client`) snippets for any Anchor struct.
+- 🎨 **Metaplex NFT & SPL Token Decoder (`nft` & `tokens`):** Resolve SPL token balances and Metaplex on-chain NFT metadata.
+- 💻 **Integrated Validator Controller (`validator`):** Spawn, stop, reset `solana-test-validator`, and request local SOL airdrops directly inside TUI.
 
-- [Rust & Cargo](https://rustup.rs/) (v1.70+)
-- [Ollama](https://ollama.com/) (Required only if you want to use the AI Assistant features)
-
-### Installation
-
-Clone the repository and build it locally:
-
-```bash
-git clone https://github.com/Ahmetcemil1/omnidb-tui.git
-cd omnidb-tui
-cargo build --release
-```
-
-Move the executable to your path:
-```bash
-sudo mv target/release/omnidb-tui /usr/local/bin/
-```
+### 🤖 Local AI Assistant (Ollama)
+- 🧠 **Natural Language to SQL (`Ctrl + Space`):** Convert English to SQL using local Ollama models (e.g., `qwen2.5-coder`, `llama3`).
+- ⚡ **AI Query Explainer & Optimizer (`Ctrl + E`):** Analyze slow SQL queries and get index optimization advice.
+- 🛠️ **AI Solana Transaction Error Diagnoser:** Send transaction failure logs to local AI to get plain-English root cause explanations and Anchor constraint fixes.
+- 📋 **AI IDL Architecture Summarizer (`idl-summary`):** Summarize complex Anchor IDLs into structured executive documentation.
 
 ---
 
-## ⚙️ Configuration & Usage
+## ⚙️ Usage & Solana Commands
 
-Start the application by running:
-```bash
-omnidb-tui
+Run `omnidb-tui` and open a new connection tab (`Ctrl + N`).
+
+### Solana Commands Reference
+
+```text
+vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR               Fetch SOL balance, owner program, and data
+code <idl_path> <struct_name> [ts|rust]                   Generate TypeScript / Rust client code snippet
+idl <idl_path> <pubkey> <struct_name>                     Decode account data using Anchor IDL schema
+tx <signature>                                            Fetch transaction logs, slot, fee, and status
+simulate <signature>                                      Simulate tx & render Compute Unit (CU) budget meter
+diff <signature>                                          Render pre-tx vs post-tx account balance diffs
+nft <mint_pubkey>                                         Decode Metaplex NFT metadata & mint info
+tokens <owner_pubkey>                                     Fetch all SPL token accounts owned by public key
+validator [start|stop|status|airdrop <pubkey> <sol>]      Control local solana-test-validator instance
+idl-summary <idl_path>                                    Summarize Anchor IDL architecture locally
 ```
-
-### Connection Bookmarks
-Connections are automatically saved locally and can be easily managed. They are stored in `~/.config/omnidb/connections.json`. You can manage SSH keys, usernames, and passwords directly from the TUI.
-
-### AI Integration Setup
-To use the Text-to-SQL or Query Explain features, ensure Ollama is running in the background:
-```bash
-ollama run llama3
-```
-OmniDB TUI will automatically detect the local Ollama API (http://localhost:11434).
 
 ---
 
 ## 🎮 Keyboard Shortcuts
 
-OmniDB TUI is designed to keep your hands on the keyboard.
-
 | Keybinding | Action |
 | :--- | :--- |
 | **`Ctrl + Space`** | Open AI Text-to-SQL Assistant |
-| **`Ctrl + E`** | Explain / Optimize Current Query via AI |
+| **`Ctrl + E`** | AI Explain & Optimize SQL Query |
 | **`Ctrl + H`** | View Query History |
-| **`Ctrl + N`** | Open New Tab |
-| **`Ctrl + X`** | Export Data (CSV/JSON/MD) |
-| **`h`, `j`, `k`, `l`** | Vim-style Navigation (Left, Down, Up, Right) |
-| **`gg` / `G`** | Jump to Top / Jump to Bottom |
+| **`Ctrl + N`** | Open New Connection Tab |
+| **`Ctrl + X`** | Export Data Grid (CSV / JSON / Markdown) |
+| **`h`, `j`, `k`, `l`** | Vim Navigation (Left, Down, Up, Right) |
+| **`gg` / `G`** | Jump to Top / Bottom |
+| **`/`** | Fuzzy Search Filter Data Grid |
+| **`i`** | Inline Cell Edit Mode |
 | **`Enter`** | Execute Query / Select Item |
 | **`Esc` / `q`** | Close Modal / Quit Application |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Getting Started & Installation
 
-- **UI Framework:** [Ratatui](https://github.com/ratatui/ratatui) + Crossterm
-- **Async Runtime:** [Tokio](https://tokio.rs/)
-- **Database Drivers:** Native Rust SQLx drivers
-- **AI Integration:** Local HTTP calls to Ollama REST API
+### Build from Source
+
+```bash
+git clone https://github.com/Ahmetcemil1/omnidb-tui.git
+cd omnidb-tui
+cargo build --release
+sudo mv target/release/omnidb-tui /usr/local/bin/
+```
+
+### Local AI Prerequisites (Optional)
+Install and run [Ollama](https://ollama.com/):
+```bash
+ollama serve
+ollama pull qwen2.5-coder
+```
+OmniDB TUI automatically detects the local Ollama API on `http://localhost:11434`.
 
 ---
-
-## ❤️ Support & Donate
-
-If OmniDB TUI has saved your life (or at least your RAM), consider supporting the development! Your support helps me spend more time adding new database drivers, optimizing the renderer, and keeping this project 100% free and open-source.
-
-**Crypto Donations:**
-- **Bitcoin (BTC):** `bc1qetuu2ehsltezy2t7f7pgr7gl388494cd9duxnd`
-- **Ethereum (ETH):** `0x9Da009aE0C9366d5944FA041dD43Dc89528DB289`
-
----
-
-## 🤝 Contributing
-
-We welcome all contributions! Whether it's adding support for Oracle/SQL Server, optimizing the Ratatui renderer, or writing unit tests:
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## 📜 License
 
