@@ -1009,6 +1009,38 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
         return Ok(false);
     }
 
+    // Alt + Number (Alt+1, Alt+2, etc.) or Alt+Left/Right -> Direct Tab Switching
+    if key.modifiers.contains(KeyModifiers::ALT) {
+        match key.code {
+            KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
+                let target_idx = (c as usize) - ('1' as usize);
+                if target_idx < app.tabs.len() {
+                    app.active_tab_idx = target_idx;
+                    let next_tab = &mut app.tabs[target_idx];
+                    if next_tab.connection_status == "Disconnected" {
+                        next_tab.connection_status = "Connecting...".to_string();
+                        let uri = next_tab.connection_uri.clone();
+                        let db_type = next_tab.db_type;
+                        let tx_clone = tx.clone();
+                        tokio::spawn(async move {
+                            connect_database(target_idx, uri, db_type, None, tx_clone).await;
+                        });
+                    }
+                }
+                return Ok(false);
+            }
+            KeyCode::Left => {
+                app.prev_tab();
+                return Ok(false);
+            }
+            KeyCode::Right => {
+                app.next_tab();
+                return Ok(false);
+            }
+            _ => {}
+        }
+    }
+
     // --- 10. MAIN VIEW NAVIGATION SHORTCUTS ---
     match key.code {
         // Quit

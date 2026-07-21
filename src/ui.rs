@@ -297,9 +297,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         " [Enter] Save Edit | [Esc] Cancel Edit | (Type value to modify cell)"
     } else {
         match active_tab.selected_view {
-            ViewMode::Tables => " [Tab] Next Tab | [←/→] Panels | [↑/↓/j/k] Select Table | [Enter] Fetch | [Ctrl+N] Bookmarks | [Ctrl+H] History | [q] Quit",
-            ViewMode::Query => " [Tab] Next Tab | [←/→] Panels | [Ctrl+Space] AI SQL | [Ctrl+E] AI Explain | [Ctrl+R] Run SQL | [Ctrl+N] Bookmarks | [Ctrl+H] History | [q] Quit",
-            ViewMode::Grid => " [Tab] Next Tab | [←/→] Panels | [↑/↓/j/k] Select Row | [i] Edit Cell | [/] Fuzzy Filter | [Ctrl+X] Export | [Ctrl+N] Bookmarks | [Ctrl+H] History | [q] Quit",
+            ViewMode::Tables => " [Tab]/[Alt+1..9] Tabs | [←/→] Panels | [↑/↓/j/k] Select Table | [Enter] Fetch | [Ctrl+N] Connect | [Ctrl+H] History | [q] Quit",
+            ViewMode::Query => " [Tab]/[Alt+1..9] Tabs | [←/→] Panels | [Ctrl+Space] AI SQL | [Ctrl+E] AI Explain | [Ctrl+R] Run | [Ctrl+N] Connect | [Ctrl+H] History | [q] Quit",
+            ViewMode::Grid => " [Tab]/[Alt+1..9] Tabs | [←/→] Panels | [↑/↓/j/k] Select Row | [i] Edit Cell | [/] Filter | [Ctrl+X] Export | [Ctrl+N] Connect | [q] Quit",
         }
     };
 
