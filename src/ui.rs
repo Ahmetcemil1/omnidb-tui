@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Tabs},
     Frame,
 };
 
@@ -325,12 +325,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         draw_ai_modal(f, app, size);
     }
 
-    if app.show_connect_modal {
-        draw_connect_modal(f, app, size);
-    }
-
     if app.show_add_bookmark_modal {
         draw_add_bookmark_modal(f, app, size);
+    } else if app.show_connect_modal {
+        draw_connect_modal(f, app, size);
     }
 
     if app.show_export_modal {
@@ -366,8 +364,7 @@ fn draw_ai_modal(f: &mut Frame, app: &App, size: Rect) {
 
     let paragraph = Paragraph::new(prompt_text).block(block);
     
-    let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    f.render_widget(clear_block, modal_rect);
+    f.render_widget(Clear, modal_rect);
     f.render_widget(paragraph, modal_rect);
 }
 
@@ -384,8 +381,7 @@ fn draw_connect_modal(f: &mut Frame, app: &App, size: Rect) {
         .border_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .title(" 🔌 Connect to Database (Ctrl+N) ");
 
-    let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    f.render_widget(clear_block, modal_rect);
+    f.render_widget(Clear, modal_rect);
     f.render_widget(block, modal_rect);
 
     // Split connection modal into 2 columns: Saved Bookmarks on Left, Quick URI Input on Right
@@ -471,8 +467,7 @@ fn draw_add_bookmark_modal(f: &mut Frame, app: &App, size: Rect) {
         }
     };
 
-    let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    f.render_widget(clear_block, modal_rect);
+    f.render_widget(Clear, modal_rect);
     f.render_widget(block, modal_rect);
 
     let name_p = Paragraph::new(format!("  Bookmark Name: {}", app.bookmark_name_input))
@@ -538,8 +533,7 @@ fn draw_export_modal(f: &mut Frame, app: &App, size: Rect) {
         .border_style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
         .title(" 📥 Export Data Grid ");
 
-    let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    f.render_widget(clear_block, modal_rect);
+    f.render_widget(Clear, modal_rect);
 
     let format_status = format!(
         "\n  Export Format: [ {} ] (Press Tab or Down to cycle format)\n\n  Target Path: {}\n\n  Press Enter to Execute Export | Esc to Cancel",
@@ -569,8 +563,7 @@ fn draw_ai_explain_modal(f: &mut Frame, app: &App, size: Rect) {
         .border_style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD))
         .title(" 🤖 AI Explain & Optimize (Ctrl+E) ");
 
-    let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    f.render_widget(clear_block, modal_rect);
+    f.render_widget(Clear, modal_rect);
     f.render_widget(block, modal_rect);
 
     let content_rect = Rect {
@@ -601,8 +594,7 @@ fn draw_history_modal(f: &mut Frame, app: &App, size: Rect) {
         .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
         .title(" 📝 SQL Query History (Ctrl+H) ");
 
-    let clear_block = Block::default().style(Style::default().bg(Color::Black));
-    f.render_widget(clear_block, modal_rect);
+    f.render_widget(Clear, modal_rect);
     f.render_widget(block, modal_rect);
 
     let mut history_items = Vec::new();
