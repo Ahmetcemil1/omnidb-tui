@@ -974,6 +974,17 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
         return Ok(false);
     }
 
+    // Ctrl + W -> Close active tab (minimum 1 tab stays)
+    if key.code == KeyCode::Char('w') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        if app.tabs.len() > 1 {
+            app.tabs.remove(tab_idx);
+            if app.active_tab_idx >= app.tabs.len() {
+                app.active_tab_idx = app.tabs.len() - 1;
+            }
+        }
+        return Ok(false);
+    }
+
 fn execute_active_tab_query(app: &mut App, tab_idx: usize, tx: Sender<AppEvent>) {
     let tab = &mut app.tabs[tab_idx];
     if matches!(tab.selected_view, ViewMode::Query) {
