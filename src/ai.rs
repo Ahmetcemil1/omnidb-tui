@@ -48,6 +48,7 @@ pub async fn generate_sql(prompt: &str, schema: &str, db_type: &str) -> Result<S
     let system_prompt = format!(
         "You are an expert SQL generation assistant for {}. \
         Given the database schema provided, generate only a valid, raw SQL query matching the user request. \
+        Use case-insensitive partial matching (like `LIKE '%text%'` or `LOWER()`) for text columns/searches unless an exact match is explicitly requested. \
         Do NOT wrap the SQL in code blocks (no ```sql or ```). Do NOT include any explanations, introduction, or comments. \
         Output ONLY the raw SQL query.",
         db_type
