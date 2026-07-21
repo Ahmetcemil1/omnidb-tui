@@ -20,7 +20,8 @@ fn clean_ethereum_uri(uri: &str) -> String {
 pub async fn execute_ethereum_command(uri: &str, command: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     let client = reqwest::Client::new();
     let url = clean_ethereum_uri(uri);
-    let cmd = command.trim();
+    let lines: Vec<&str> = command.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+    let cmd = if let Some(last_line) = lines.last() { *last_line } else { "" };
 
     if cmd.is_empty() || cmd.eq_ignore_ascii_case("block") || cmd.eq_ignore_ascii_case("latest") {
         return fetch_ethereum_block(&url, &client).await;
