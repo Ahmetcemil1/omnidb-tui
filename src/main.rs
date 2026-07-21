@@ -15,6 +15,8 @@ mod ai;
 mod ui;
 mod bookmarks;
 mod solana;
+mod redis;
+mod mongo;
 
 use app::{App, AppEvent, ViewMode, log_history};
 use db::DbType;
@@ -99,6 +101,8 @@ async fn connect_database(
             DbType::MySql => 3306,
             DbType::Sqlite => 0,
             DbType::Solana => 8899,
+            DbType::Redis => 6379,
+            DbType::Mongo => 27017,
         };
         let (db_host, db_port) = bookmarks::parse_host_port_from_uri(&uri, default_port);
 
@@ -181,6 +185,41 @@ async fn connect_database(
         }
         return;
     }
+    if db_type == DbType::Redis {
+        sqlx::any::install_default_drivers();
+        let pool = sqlx::any::AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        let tables = vec!["keys".to_string(), "info".to_string()];
+        let _ = tx.send(AppEvent::DbConnected {
+            tab_idx,
+            pool,
+            tables,
+            ssh_child: None,
+            ssh_port: None,
+        }).await;
+        return;
+    }
+
+    if db_type == DbType::Mongo {
+        sqlx::any::install_default_drivers();
+        let pool = sqlx::any::AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        let tables = vec!["collections".to_string(), "stats".to_string()];
+        let _ = tx.send(AppEvent::DbConnected {
+            tab_idx,
+            pool,
+            tables,
+            ssh_child: None,
+            ssh_port: None,
+        }).await;
+        return;
+    }
 
     match db::connect(&uri).await {
         Ok(pool) => {
@@ -225,6 +264,28 @@ async fn run_query(tab_idx: usize, pool: sqlx::AnyPool, sql: String, tx: Sender<
 
 async fn run_solana_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
     match solana::execute_solana_command(&uri, &command).await {
+        Ok((headers, rows)) => {
+            let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
+        }
+        Err(e) => {
+            let _ = tx.send(AppEvent::QueryFailed { tab_idx, error: e.to_string() }).await;
+        }
+    }
+}
+
+async fn run_redis_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
+    match redis::execute_redis_command(&uri, &command).await {
+        Ok((headers, rows)) => {
+            let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
+        }
+        Err(e) => {
+            let _ = tx.send(AppEvent::QueryFailed { tab_idx, error: e.to_string() }).await;
+        }
+    }
+}
+
+async fn run_mongo_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
+    match mongo::execute_mongo_command(&uri, &command).await {
         Ok((headers, rows)) => {
             let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
         }
@@ -764,6 +825,8 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                         DbType::MySql => "Custom MySQL",
                         DbType::Sqlite => "Custom SQLite",
                         DbType::Solana => "Custom Solana RPC",
+                        DbType::Redis => "Custom Redis Key-Store",
+                        DbType::Mongo => "Custom MongoDB Document-Store",
                     };
 
                     let new_idx = app.tabs.len();
@@ -870,6 +933,12 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                 if tab.db_type == DbType::Solana {
                     let uri_clone = tab.connection_uri.clone();
                     tokio::spawn(run_solana_query(tab_idx, uri_clone, sql, tx.clone()));
+                } else if tab.db_type == DbType::Redis {
+                    let uri_clone = tab.connection_uri.clone();
+                    tokio::spawn(run_redis_query(tab_idx, uri_clone, sql, tx.clone()));
+                } else if tab.db_type == DbType::Mongo {
+                    let uri_clone = tab.connection_uri.clone();
+                    tokio::spawn(run_mongo_query(tab_idx, uri_clone, sql, tx.clone()));
                 } else if let Some(pool) = &tab.connection_pool {
                     let pool_clone = pool.clone();
                     tokio::spawn(run_query(tab_idx, pool_clone, sql, tx.clone()));

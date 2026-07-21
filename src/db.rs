@@ -7,6 +7,8 @@ pub enum DbType {
     MySql,
     Sqlite,
     Solana,
+    Redis,
+    Mongo,
 }
 
 pub fn detect_db_type(uri: &str) -> DbType {
@@ -16,6 +18,10 @@ pub fn detect_db_type(uri: &str) -> DbType {
         DbType::MySql
     } else if uri.starts_with("solana") {
         DbType::Solana
+    } else if uri.starts_with("redis") {
+        DbType::Redis
+    } else if uri.starts_with("mongo") || uri.starts_with("mongodb") {
+        DbType::Mongo
     } else {
         DbType::Sqlite
     }
@@ -53,7 +59,7 @@ pub async fn get_tables(pool: &AnyPool, db_type: DbType) -> Result<Vec<String>> 
         DbType::Sqlite => {
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
         }
-        DbType::Solana => unreachable!(),
+        DbType::Solana | DbType::Redis | DbType::Mongo => unreachable!(),
     };
 
     let rows = sqlx::query(query_str).fetch_all(pool).await?;
@@ -120,7 +126,7 @@ pub async fn get_schema(pool: &AnyPool, db_type: DbType) -> Result<String> {
                 }
             }
         }
-        DbType::Solana => unreachable!(),
+        DbType::Solana | DbType::Redis | DbType::Mongo => unreachable!(),
     }
 
     Ok(schema_desc)
