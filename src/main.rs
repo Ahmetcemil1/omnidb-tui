@@ -919,8 +919,12 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
     }
 
     // --- 9. TRIGGER MODAL KEYBOARD SHORTCUTS ---
-    // Ctrl + Space -> Open AI modal
-    if key.code == KeyCode::Char(' ') && key.modifiers.contains(KeyModifiers::CONTROL) {
+    // Ctrl + Space, Ctrl + A, Ctrl + P or NUL byte -> Open AI modal
+    if (key.code == KeyCode::Char(' ') && key.modifiers.contains(KeyModifiers::CONTROL))
+        || key.code == KeyCode::Char('\0')
+        || (key.code == KeyCode::Char('a') && key.modifiers.contains(KeyModifiers::CONTROL))
+        || (key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL))
+    {
         app.show_ai_modal = true;
         return Ok(false);
     }
@@ -1274,6 +1278,7 @@ fn execute_active_tab_query(app: &mut App, tab_idx: usize, tx: Sender<AppEvent>)
                             app.pending_query = true;
                             let sql = format!("SELECT * FROM {} LIMIT 500;", table);
                             tab.query_editor_content = sql.clone();
+                            tab.selected_view = ViewMode::Grid; // Switch to grid view automatically!
                             
                             let pool_clone = pool.clone();
                             tokio::spawn(run_query(tab_idx, pool_clone, sql, tx.clone()));
