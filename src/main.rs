@@ -331,6 +331,30 @@ async fn run_ai_explain(prompt: String, schema: String, db_type_str: String, tx:
     }
 }
 
+/// Helper function to diagnose Solana transaction errors using AI in the background
+pub async fn _run_ai_diagnose(logs: String, err_msg: String, tx: Sender<AppEvent>) {
+    match ai::diagnose_tx_error(&logs, &err_msg).await {
+        Ok(explanation) => {
+            let _ = tx.send(AppEvent::AiExplainedSql { explanation }).await;
+        }
+        Err(e) => {
+            let _ = tx.send(AppEvent::AiExplainFailed { error: e.to_string() }).await;
+        }
+    }
+}
+
+/// Helper function to summarize IDL architecture using AI in the background
+pub async fn _run_ai_idl_summarize(idl_json: String, tx: Sender<AppEvent>) {
+    match ai::summarize_idl(&idl_json).await {
+        Ok(explanation) => {
+            let _ = tx.send(AppEvent::AiExplainedSql { explanation }).await;
+        }
+        Err(e) => {
+            let _ = tx.send(AppEvent::AiExplainFailed { error: e.to_string() }).await;
+        }
+    }
+}
+
 /// Helper function to export data in the background
 async fn run_export(
     headers: Vec<String>,

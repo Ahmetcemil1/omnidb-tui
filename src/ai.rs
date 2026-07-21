@@ -125,3 +125,81 @@ pub async fn explain_sql(sql: &str, schema: &str, db_type: &str) -> Result<Strin
     Ok(result.response.trim().to_string())
 }
 
+pub async fn diagnose_tx_error(logs: &str, err_msg: &str) -> Result<String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()?;
+
+    let model = get_active_model(&client).await;
+
+    let system_prompt = "You are a Solana Smart Contract (Anchor) debugging expert. \
+        Given transaction logs and RPC error messages, explain in plain English why the transaction failed, \
+        identify the exact failing instruction/constraint (e.g. ConstraintMut, ConstraintHasOne), and suggest a concrete code fix.".to_string();
+
+    let full_prompt = format!(
+        "RPC Error:\n{}\n\nTransaction Logs:\n{}\n\nDiagnosis & Fix:",
+        err_msg, logs
+    );
+
+    let req_payload = OllamaGenerateRequest {
+        model,
+        prompt: full_prompt,
+        stream: false,
+        system: system_prompt,
+    };
+
+    let url = "http://localhost:11434/api/generate";
+    let resp = client
+        .post(url)
+        .json(&req_payload)
+        .send()
+        .await
+        .map_err(|e| anyhow!("Failed to connect to local Ollama API: {}. Make sure Ollama is running.", e))?;
+
+    if !resp.status().is_success() {
+        return Err(anyhow!("Ollama server returned status code: {}", resp.status()));
+    }
+
+    let result = resp.json::<OllamaGenerateResponse>().await?;
+    Ok(result.response.trim().to_string())
+}
+
+pub async fn summarize_idl(idl_json: &str) -> Result<String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()?;
+
+    let model = get_active_model(&client).await;
+
+    let system_prompt = "You are a Solana Anchor IDL documentation assistant. \
+        Given an Anchor IDL JSON definition, generate a clean, executive summary of the smart contract's instructions, \
+        state accounts, and key architectural flows in clean markdown text.".to_string();
+
+    let full_prompt = format!(
+        "Anchor IDL JSON:\n{}\n\nExecutive Architecture Summary:",
+        idl_json
+    );
+
+    let req_payload = OllamaGenerateRequest {
+        model,
+        prompt: full_prompt,
+        stream: false,
+        system: system_prompt,
+    };
+
+    let url = "http://localhost:11434/api/generate";
+    let resp = client
+        .post(url)
+        .json(&req_payload)
+        .send()
+        .await
+        .map_err(|e| anyhow!("Failed to connect to local Ollama API: {}. Make sure Ollama is running.", e))?;
+
+    if !resp.status().is_success() {
+        return Err(anyhow!("Ollama server returned status code: {}", resp.status()));
+    }
+
+    let result = resp.json::<OllamaGenerateResponse>().await?;
+    Ok(result.response.trim().to_string())
+}
+
