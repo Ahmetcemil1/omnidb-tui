@@ -22,6 +22,25 @@ pub async fn execute_solana_command(uri: &str, command: &str) -> Result<(Vec<Str
     let url = clean_solana_uri(uri);
     let cmd = command.trim();
     
+    if cmd.starts_with("code ") {
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 3 {
+            return Err(anyhow::anyhow!("Usage: code <idl_path> <struct_name> [ts|rust]"));
+        }
+        let idl_path = parts[1];
+        let struct_name = parts[2];
+        let lang = if parts.len() >= 4 { parts[3] } else { "ts" };
+        let snippet = generate_client_code(idl_path, struct_name, lang)?;
+        let rows = vec![
+            vec!["Language".to_string(), lang.to_uppercase()],
+            vec!["Target Struct".to_string(), struct_name.to_string()],
+            vec!["Source IDL".to_string(), idl_path.to_string()],
+            vec!["Code Snippet".to_string(), snippet],
+        ];
+        let headers = vec!["Attribute".to_string(), "Generated Client Code".to_string()];
+        return Ok((headers, rows));
+    }
+    
     if cmd.starts_with("idl ") {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 4 {
@@ -42,6 +61,29 @@ pub async fn execute_solana_command(uri: &str, command: &str) -> Result<(Vec<Str
         return fetch_solana_transaction(&url, sig, &client).await;
     }
     
+    if cmd.starts_with("simulate ") {
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 2 {
+            return Err(anyhow::anyhow!("Usage: simulate <signature>"));
+        }
+        let sig = parts[1];
+        return simulate_solana_transaction(&url, sig, &client).await;
+    }
+    
+    if cmd.starts_with("validator ") {
+        let sub_cmd = cmd[10..].trim();
+        return control_local_validator(&url, sub_cmd, &client).await;
+    }
+    
+    if cmd.starts_with("tokens ") {
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 2 {
+            return Err(anyhow::anyhow!("Usage: tokens <owner_pubkey>"));
+        }
+        let pubkey = parts[1];
+        return fetch_spl_tokens(&url, pubkey, &client).await;
+    }
+    
     if cmd.starts_with("history ") {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
@@ -55,7 +97,53 @@ pub async fn execute_solana_command(uri: &str, command: &str) -> Result<(Vec<Str
         return fetch_solana_account_info(&url, cmd, &client).await;
     }
     
-    Err(anyhow::anyhow!("Unknown Solana command. Use a pubkey, 'tx <signature>', 'history <pubkey>', or 'idl <path> <pubkey> <struct>'."))
+    Err(anyhow::anyhow!("Unknown Solana command. Use a pubkey, 'code <idl> <struct> [ts|rust]', 'tx <sig>', 'history <pubkey>', or 'idl <path> <pubkey> <struct>'."))
+}
+
+pub fn generate_client_code(idl_path: &str, struct_name: &str, lang: &str) -> Result<String> {
+    let idl_content = std::fs::read_to_string(idl_path)?;
+    let idl: serde_json::Value = serde_json::from_str(&idl_content)?;
+    
+    let program_name = idl["name"].as_str().unwrap_or("my_program");
+    let struct_lower = struct_name.to_lowercase();
+    
+    if lang.eq_ignore_ascii_case("rust") {
+        Ok(format!(
+            "// --- Anchor Rust Client Snippet for {}\n\
+            use anchor_client::{{Client, Cluster}};\n\
+            use solana_sdk::pubkey::Pubkey;\n\
+            use solana_sdk::signature::Keypair;\n\
+            use std::rc::Rc;\n\
+            use std::str::FromStr;\n\n\
+            pub fn fetch_{}(program_id_str: &str, account_pubkey_str: &str) -> anyhow::Result<()> {{\n    \
+                let payer = Keypair::new();\n    \
+                let client = Client::new(Cluster::Devnet, Rc::new(payer));\n    \
+                let program = client.program(Pubkey::from_str(program_id_str)?);\n    \
+                let account: {} = program.account(Pubkey::from_str(account_pubkey_str)?)?;\n    \
+                println!(\"Fetched account state: {{:?}}\", account);\n    \
+                Ok(())\n\
+            }}",
+            struct_name, struct_lower, struct_name
+        ))
+    } else {
+        Ok(format!(
+            "// --- Anchor TypeScript Client Snippet for {}\n\
+            import * as anchor from \"@coral-xyz/anchor\";\n\
+            import {{ PublicKey }} from \"@solana/web3.js\";\n\n\
+            export async function fetch{}(programIdStr: string, accountPubkeyStr: string) {{\n    \
+                const connection = new anchor.web3.Connection(\"https://api.devnet.solana.com\");\n    \
+                const provider = anchor.AnchorProvider.env();\n    \
+                const programId = new PublicKey(programIdStr);\n    \
+                const accountPubkey = new PublicKey(accountPubkeyStr);\n    \
+                const idl = await anchor.Program.fetchIdl(programId, provider);\n    \
+                const program = new anchor.Program(idl!, provider);\n    \
+                const data = await program.account.{}.fetch(accountPubkey);\n    \
+                console.log(\"Decoded {} State:\", data);\n    \
+                return data;\n\
+            }}",
+            struct_name, struct_name, struct_lower, program_name
+        ))
+    }
 }
 
 async fn fetch_solana_account_info(url: &str, pubkey: &str, client: &reqwest::Client) -> Result<(Vec<String>, Vec<Vec<String>>)> {
@@ -191,6 +279,211 @@ async fn fetch_solana_transaction(url: &str, sig: &str, client: &reqwest::Client
     
     let headers = vec!["Field".to_string(), "Value".to_string()];
     Ok((headers, rows))
+}
+
+pub async fn simulate_solana_transaction(
+    url: &str,
+    sig: &str,
+    client: &reqwest::Client,
+) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    let req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getTransaction",
+        "params": [sig, { "encoding": "json", "maxSupportedTransactionVersion": 0 }]
+    });
+    
+    let res: serde_json::Value = client.post(url).json(&req).send().await?.json().await?;
+    if let Some(err) = res.get("error") {
+        return Err(anyhow::anyhow!("RPC Error: {}", err["message"].as_str().unwrap_or("Unknown")));
+    }
+    
+    if res["result"].is_null() {
+        return Err(anyhow::anyhow!("Transaction not found for simulation analysis."));
+    }
+    
+    let logs_array = res["result"]["meta"]["logMessages"].as_array();
+    let compute_units_consumed = res["result"]["meta"]["computeUnitsConsumed"].as_u64().unwrap_or(0);
+    
+    let max_budget = 200_000u64;
+    let cu_ratio = if compute_units_consumed > 0 {
+        (compute_units_consumed as f64 / max_budget as f64 * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+    
+    let bar_len = 20;
+    let filled = ((cu_ratio / 100.0) * bar_len as f64).round() as usize;
+    let bar = format!("[{}{}] {:.1}% ({} / {} CU)", 
+        "█".repeat(filled.min(bar_len)), 
+        "░".repeat(bar_len.saturating_sub(filled)),
+        cu_ratio,
+        compute_units_consumed,
+        max_budget
+    );
+    
+    let mut rows = vec![
+        vec!["Compute Unit (CU) Budget Meter".to_string(), bar],
+        vec!["CU Consumed Raw".to_string(), compute_units_consumed.to_string()],
+    ];
+    
+    if let Some(logs) = logs_array {
+        for (idx, log_val) in logs.iter().enumerate() {
+            let log_str = log_val.as_str().unwrap_or("");
+            let formatted_log = if log_str.contains("failed") || log_str.contains("Error") || log_str.contains("panic") {
+                format!("🟥 [ERROR] {}", log_str)
+            } else if log_str.contains("msg!") || log_str.contains("Instruction:") {
+                format!("🟨 [TRACE] {}", log_str)
+            } else {
+                format!("🟩 [INFO] {}", log_str)
+            };
+            rows.push(vec![format!("Log Step #{}", idx + 1), formatted_log]);
+        }
+    }
+    
+    let headers = vec!["Simulation Metric / Log Step".to_string(), "Result Trace".to_string()];
+    Ok((headers, rows))
+}
+
+pub async fn fetch_spl_tokens(
+    url: &str,
+    pubkey: &str,
+    client: &reqwest::Client,
+) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    let req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getTokenAccountsByOwner",
+        "params": [
+            pubkey,
+            { "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+            { "encoding": "jsonParsed" }
+        ]
+    });
+    
+    let res: serde_json::Value = client.post(url).json(&req).send().await?.json().await?;
+    if let Some(err) = res.get("error") {
+        return Err(anyhow::anyhow!("RPC Error: {}", err["message"].as_str().unwrap_or("Unknown")));
+    }
+    
+    let mut rows = Vec::new();
+    if let Some(arr) = res["result"]["value"].as_array() {
+        for item in arr {
+            let token_account = item["pubkey"].as_str().unwrap_or("").to_string();
+            let info = &item["account"]["data"]["parsed"]["info"];
+            let mint = info["mint"].as_str().unwrap_or("").to_string();
+            let amount = info["tokenAmount"]["uiAmountString"].as_str().unwrap_or("0").to_string();
+            let decimals = info["tokenAmount"]["decimals"].as_u64().unwrap_or(0).to_string();
+            
+            rows.push(vec![token_account, mint, amount, decimals]);
+        }
+    }
+    
+    if rows.is_empty() {
+        rows.push(vec!["N/A".to_string(), "No SPL Token accounts found for owner".to_string(), "0".to_string(), "0".to_string()]);
+    }
+    
+    let headers = vec!["Token Account".to_string(), "Mint Address".to_string(), "Balance".to_string(), "Decimals".to_string()];
+    Ok((headers, rows))
+}
+
+pub async fn control_local_validator(
+    url: &str,
+    sub_cmd: &str,
+    client: &reqwest::Client,
+) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    let headers = vec!["Local Validator Control".to_string(), "Status / Result".to_string()];
+    
+    if sub_cmd.starts_with("start") {
+        let child = std::process::Command::new("solana-test-validator")
+            .arg("--reset")
+            .spawn();
+        
+        match child {
+            Ok(c) => {
+                let rows = vec![
+                    vec!["Process Status".to_string(), "Spawned solana-test-validator".to_string()],
+                    vec!["PID".to_string(), c.id().to_string()],
+                    vec!["Endpoint".to_string(), "http://127.0.0.1:8899".to_string()],
+                ];
+                Ok((headers, rows))
+            }
+            Err(e) => {
+                let rows = vec![
+                    vec!["Process Status".to_string(), "Failed to spawn solana-test-validator".to_string()],
+                    vec!["Error".to_string(), format!("{}", e)],
+                    vec!["Note".to_string(), "Ensure 'solana-test-validator' CLI is installed and in PATH".to_string()],
+                ];
+                Ok((headers, rows))
+            }
+        }
+    } else if sub_cmd.starts_with("stop") {
+        let status = std::process::Command::new("pkill")
+            .arg("-f")
+            .arg("solana-test-validator")
+            .status();
+        
+        let msg = match status {
+            Ok(s) if s.success() => "Terminated solana-test-validator process successfully.",
+            _ => "No running solana-test-validator process found or pkill failed.",
+        };
+        
+        let rows = vec![
+            vec!["Command".to_string(), "stop".to_string()],
+            vec!["Result".to_string(), msg.to_string()],
+        ];
+        Ok((headers, rows))
+    } else if sub_cmd.starts_with("airdrop ") {
+        let parts: Vec<&str> = sub_cmd.split_whitespace().collect();
+        if parts.len() < 3 {
+            return Err(anyhow::anyhow!("Usage: validator airdrop <pubkey> <sol_amount>"));
+        }
+        let target_pubkey = parts[1];
+        let amount_sol: f64 = parts[2].parse().unwrap_or(1.0);
+        let lamports = (amount_sol * 1_000_000_000.0) as u64;
+        
+        let req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "requestAirdrop",
+            "params": [target_pubkey, lamports]
+        });
+        
+        let res: serde_json::Value = client.post(url).json(&req).send().await?.json().await?;
+        if let Some(err) = res.get("error") {
+            return Err(anyhow::anyhow!("Airdrop RPC Error: {}", err["message"].as_str().unwrap_or("Unknown")));
+        }
+        
+        let tx_sig = res["result"].as_str().unwrap_or("Requested");
+        let rows = vec![
+            vec!["Target Pubkey".to_string(), target_pubkey.to_string()],
+            vec!["Amount (SOL)".to_string(), amount_sol.to_string()],
+            vec!["Transaction Sig".to_string(), tx_sig.to_string()],
+        ];
+        Ok((headers, rows))
+    } else {
+        // Status check
+        let req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getHealth"
+        });
+        
+        let health = match client.post(url).json(&req).send().await {
+            Ok(resp) => {
+                let json: serde_json::Value = resp.json().await.unwrap_or_default();
+                if json["result"] == "ok" { "Healthy (Running)".to_string() } else { format!("{:?}", json) }
+            }
+            Err(_) => "Offline / Unreachable".to_string(),
+        };
+        
+        let rows = vec![
+            vec!["Target RPC URL".to_string(), url.to_string()],
+            vec!["Health Check".to_string(), health],
+            vec!["Supported Commands".to_string(), "validator start | validator stop | validator airdrop <pubkey> <sol>".to_string()],
+        ];
+        Ok((headers, rows))
+    }
 }
 
 async fn run_solana_idl_decode(
@@ -462,5 +755,53 @@ mod tests {
         
         let has_balance = rows.iter().any(|r| r[0] == "Balance (SOL)");
         assert!(has_balance);
+    }
+
+    #[test]
+    fn test_client_code_generator() {
+        let tmp_dir = std::env::temp_dir();
+        let idl_path = tmp_dir.join("test_idl.json");
+        let idl_json = serde_json::json!({
+            "name": "staking_program",
+            "accounts": [
+                {
+                    "name": "UserStake",
+                    "type": { "kind": "struct", "fields": [] }
+                }
+            ]
+        });
+        std::fs::write(&idl_path, idl_json.to_string()).unwrap();
+
+        let ts_code = generate_client_code(idl_path.to_str().unwrap(), "UserStake", "ts").unwrap();
+        assert!(ts_code.contains("fetchUserStake"));
+        assert!(ts_code.contains("@coral-xyz/anchor"));
+
+        let rust_code = generate_client_code(idl_path.to_str().unwrap(), "UserStake", "rust").unwrap();
+        assert!(rust_code.contains("fetch_userstake"));
+        assert!(rust_code.contains("anchor_client"));
+    }
+
+    #[tokio::test]
+    async fn test_spl_tokens_fetch() {
+        let client = reqwest::Client::new();
+        let url = "https://api.devnet.solana.com";
+        let pubkey = "vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR";
+        
+        let res = fetch_spl_tokens(url, pubkey, &client).await;
+        assert!(res.is_ok(), "Failed to query SPL tokens: {:?}", res.err());
+        let (headers, rows) = res.unwrap();
+        assert_eq!(headers.len(), 4);
+        assert!(!rows.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_validator_control() {
+        let client = reqwest::Client::new();
+        let url = "http://127.0.0.1:8899";
+        let res = control_local_validator(url, "status", &client).await;
+        assert!(res.is_ok());
+        let (headers, rows) = res.unwrap();
+        assert_eq!(headers[0], "Local Validator Control");
+        assert!(!rows.is_empty());
     }
 }
