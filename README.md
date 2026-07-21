@@ -53,6 +53,7 @@ graph TD
 | ⚡ **Redis** | `redis://host:6379` | Key-Value explorer, `KEYS *` pattern search, `GET <key>`, `INFO` memory metrics |
 | 🍃 **MongoDB** | `mongodb://host:27017` | BSON / JSON document collection viewer, `find <coll>`, database cluster stats |
 | 🟣 **Solana RPC** | `solana://api.devnet.solana.com` | Anchor IDL decode, `simulateTransaction` CU budget meter, `diff` state viewer, `nft` Metaplex decoder, `tokens` portfolio, `solana-test-validator` manager |
+| 🔷 **Ethereum EVM** | `ethereum://eth-rpc.publicnode.com` | EVM account balance (`eth_getBalance`), block inspector (`eth_getBlockByNumber`), tx tracer (`tx`), ERC-20 token balance reader (`erc20`) |
 
 ---
 

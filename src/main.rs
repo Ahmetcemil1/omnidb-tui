@@ -17,6 +17,7 @@ mod bookmarks;
 mod solana;
 mod redis;
 mod mongo;
+mod ethereum;
 
 use app::{App, AppEvent, ViewMode, log_history};
 use db::DbType;
@@ -103,6 +104,7 @@ async fn connect_database(
             DbType::Solana => 8899,
             DbType::Redis => 6379,
             DbType::Mongo => 27017,
+            DbType::Ethereum => 8545,
         };
         let (db_host, db_port) = bookmarks::parse_host_port_from_uri(&uri, default_port);
 
@@ -221,6 +223,24 @@ async fn connect_database(
         return;
     }
 
+    if db_type == DbType::Ethereum {
+        sqlx::any::install_default_drivers();
+        let pool = sqlx::any::AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        let tables = vec!["Account Info".to_string(), "Latest Block".to_string(), "ERC-20 Tokens".to_string()];
+        let _ = tx.send(AppEvent::DbConnected {
+            tab_idx,
+            pool,
+            tables,
+            ssh_child: None,
+            ssh_port: None,
+        }).await;
+        return;
+    }
+
     match db::connect(&uri).await {
         Ok(pool) => {
             match db::get_tables(&pool, db_type).await {
@@ -286,6 +306,17 @@ async fn run_redis_query(tab_idx: usize, uri: String, command: String, tx: Sende
 
 async fn run_mongo_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
     match mongo::execute_mongo_command(&uri, &command).await {
+        Ok((headers, rows)) => {
+            let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
+        }
+        Err(e) => {
+            let _ = tx.send(AppEvent::QueryFailed { tab_idx, error: e.to_string() }).await;
+        }
+    }
+}
+
+async fn run_ethereum_query(tab_idx: usize, uri: String, command: String, tx: Sender<AppEvent>) {
+    match ethereum::execute_ethereum_command(&uri, &command).await {
         Ok((headers, rows)) => {
             let _ = tx.send(AppEvent::QueryExecuted { tab_idx, headers, rows }).await;
         }
@@ -851,6 +882,7 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                         DbType::Solana => "Custom Solana RPC",
                         DbType::Redis => "Custom Redis Key-Store",
                         DbType::Mongo => "Custom MongoDB Document-Store",
+                        DbType::Ethereum => "Custom Ethereum EVM RPC",
                     };
 
                     let new_idx = app.tabs.len();
@@ -963,6 +995,9 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                 } else if tab.db_type == DbType::Mongo {
                     let uri_clone = tab.connection_uri.clone();
                     tokio::spawn(run_mongo_query(tab_idx, uri_clone, sql, tx.clone()));
+                } else if tab.db_type == DbType::Ethereum {
+                    let uri_clone = tab.connection_uri.clone();
+                    tokio::spawn(run_ethereum_query(tab_idx, uri_clone, sql, tx.clone()));
                 } else if let Some(pool) = &tab.connection_pool {
                     let pool_clone = pool.clone();
                     tokio::spawn(run_query(tab_idx, pool_clone, sql, tx.clone()));
