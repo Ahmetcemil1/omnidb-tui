@@ -1,0 +1,83 @@
+[env]
+TERM = "xterm-256color"
+
+[window]
+dynamic_padding = false
+decorations = "full"
+title = "OmniDB TUI — v0.1.0 Launch Demo"
+opacity = 0.97
+decorations_theme_variant = "Dark"
+
+[window.dimensions]
+columns = 140
+lines = 38
+
+[window.padding]
+x = 8
+y = 8
+
+[window.class]
+instance = "Alacritty"
+general = "Alacritty"
+
+[scrolling]
+history = 10000
+multiplier = 3
+
+[colors]
+draw_bold_text_with_bright_colors = true
+
+# Deep dark background (better for terminal video recording)
+[colors.primary]
+background = "0x0D1117"
+foreground = "0xE6EDF3"
+
+[colors.cursor]
+text    = "0x0D1117"
+cursor  = "0x58A6FF"
+
+[colors.selection]
+text       = "0xE6EDF3"
+background = "0x1F4580"
+
+[colors.normal]
+black   = "0x161B22"
+red     = "0xFF7B72"
+green   = "0x3FB950"
+yellow  = "0xD29922"
+blue    = "0x58A6FF"
+magenta = "0xBC8CFF"
+cyan    = "0x39C5CF"
+white   = "0xB1BAC4"
+
+[colors.bright]
+black   = "0x6E7681"
+red     = "0xFFA198"
+green   = "0x56D364"
+yellow  = "0xE3B341"
+blue    = "0x79C0FF"
+magenta = "0xD2A8FF"
+cyan    = "0x56D4DD"
+white   = "0xF0F6FC"
+
+[font]
+size = 14
+
+[font.normal]
+family = "monospace"
+style = "Regular"
+
+[font.bold]
+family = "monospace"
+style = "Bold"
+
+[cursor]
+style = "Block"
+blink_interval = 750
+unfocused_hollow = true
+
+[mouse]
+hide_when_typing = true
+
+[general]
+live_config_reload = true

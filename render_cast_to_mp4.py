@@ -1,124 +1,139 @@
 #!/usr/bin/env python3
-import json
-import os
-import sys
-import subprocess
+"""
+Cast-to-MP4 Renderer for OmniDB TUI
+Converts asciinema .cast files to proper HD MP4 videos using
+pyte terminal emulation + Pillow frame rendering + ffmpeg encoding.
+"""
+import json, os, sys, subprocess
 import pyte
 from PIL import Image, ImageDraw, ImageFont
 
-def get_font():
-    # Try system monospace fonts
-    font_paths = [
+# ── Color palette (GitHub Dark) ───────────────────────────────────────────────
+BG          = (13,  17,  23)   # canvas background
+WIN_BAR     = (22,  27,  34)   # title-bar
+WIN_FG      = (139, 148, 158)  # title-bar text
+BTN_RED     = (255, 95,  86)
+BTN_YEL     = (255, 189, 46)
+BTN_GRN     = (39,  201, 63)
+
+COLORS = {
+    "default":       (230, 237, 243),
+    "black":         (22,  27,  34),
+    "red":           (255, 123, 114),
+    "green":         (63,  185, 80),
+    "yellow":        (210, 153, 34),
+    "blue":          (88,  166, 255),
+    "magenta":       (188, 140, 255),
+    "cyan":          (57,  197, 207),
+    "white":         (177, 186, 196),
+    "brightblack":   (110, 118, 129),
+    "brightred":     (255, 161, 152),
+    "brightgreen":   (86,  211, 100),
+    "brightyellow":  (227, 179, 65),
+    "brightblue":    (121, 192, 255),
+    "brightmagenta": (210, 168, 255),
+    "brightcyan":    (86,  212, 221),
+    "brightwhite":   (240, 246, 252),
+}
+
+def hex_to_rgb(h):
+    h = h.lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+def resolve(color, is_bg=False):
+    if color == "default":
+        return BG if is_bg else COLORS["default"]
+    if isinstance(color, str) and color in COLORS:
+        return COLORS[color]
+    if isinstance(color, str) and len(color) == 6:
+        try:
+            return hex_to_rgb(color)
+        except Exception:
+            pass
+    return BG if is_bg else COLORS["default"]
+
+
+def get_font(size=15):
+    candidates = [
+        "/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf",
         "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
         "/usr/share/fonts/TTF/LiberationMono-Regular.ttf",
         "/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
     ]
-    for p in font_paths:
+    for p in candidates:
         if os.path.exists(p):
             try:
-                return ImageFont.truetype(p, 16)
+                return ImageFont.truetype(p, size)
             except Exception:
                 pass
     return ImageFont.load_default()
 
-def color_to_rgb(color_name, is_bg=False):
-    default_fg = (204, 204, 204)
-    default_bg = (24, 24, 30)
-    
-    if color_name == "default":
-        return default_bg if is_bg else default_fg
-        
-    color_map = {
-        "black": (20, 20, 20),
-        "red": (235, 87, 87),
-        "green": (39, 201, 63),
-        "yellow": (241, 196, 15),
-        "blue": (52, 152, 219),
-        "magenta": (155, 89, 182),
-        "cyan": (26, 188, 156),
-        "white": (236, 240, 241),
-        "brightblack": (100, 100, 100),
-        "brightred": (255, 100, 100),
-        "brightgreen": (100, 255, 100),
-        "brightyellow": (255, 255, 100),
-        "brightblue": (100, 100, 255),
-        "brightmagenta": (255, 100, 255),
-        "brightcyan": (100, 255, 255),
-        "brightwhite": (255, 255, 255),
-    }
-    
-    if isinstance(color_name, str) and color_name in color_map:
-        return color_map[color_name]
-        
-    # Hex or tuple color
-    if isinstance(color_name, str) and len(color_name) == 6:
-        try:
-            return (int(color_name[0:2], 16), int(color_name[2:4], 16), int(color_name[4:6], 16))
-        except ValueError:
-            pass
-            
-    return default_bg if is_bg else default_fg
 
-def render_screen_to_image(screen, font, char_width=11, char_height=24, cols=120, rows=35):
-    img_w = cols * char_width + 40
-    img_h = rows * char_height + 50
-    
-    img = Image.new("RGB", (img_w, img_h), (24, 24, 30))
+def render_frame(screen, font, cw, ch, cols, rows):
+    title = "  OmniDB TUI  v0.1.0  —  Multi-Database Terminal Workspace"
+    bar_h = 36
+    pad_x = 12
+    pad_y = 10
+    img_w = cols * cw + pad_x * 2
+    img_h = rows * ch + pad_y * 2 + bar_h
+
+    img = Image.new("RGB", (img_w, img_h), BG)
     draw = ImageDraw.Draw(img)
-    
-    # Draw top window bar (Mac/Linux TUI style)
-    draw.rectangle([0, 0, img_w, 30], fill=(35, 35, 45))
-    draw.ellipse([15, 10, 25, 20], fill=(255, 95, 86)) # Close
-    draw.ellipse([32, 10, 42, 20], fill=(255, 189, 46)) # Minimize
-    draw.ellipse([49, 10, 59, 20], fill=(39, 201, 63)) # Maximize
-    draw.text((70, 7), "OmniDB TUI Workspace — Alacritty Terminal", fill=(180, 180, 190), font=font)
 
-    margin_x = 20
-    margin_y = 40
+    # Window title bar
+    draw.rectangle([0, 0, img_w, bar_h], fill=WIN_BAR)
+    # Traffic-light buttons
+    for i, col in enumerate([BTN_RED, BTN_YEL, BTN_GRN]):
+        cx = 16 + i * 22
+        draw.ellipse([cx-6, bar_h//2-6, cx+6, bar_h//2+6], fill=col)
+    # Title text
+    draw.text((72, bar_h//2 - 7), title, fill=WIN_FG, font=font)
+    # Separator line
+    draw.rectangle([0, bar_h, img_w, bar_h + 1], fill=(48, 54, 61))
 
-    for y in range(rows):
-        row_cells = screen.buffer[y]
-        for x in range(cols):
-            cell = row_cells[x]
-            char = cell.data
-            fg = color_to_rgb(cell.fg)
-            bg = color_to_rgb(cell.bg, is_bg=True)
-            
-            px = margin_x + x * char_width
-            py = margin_y + y * char_height
-            
-            if bg != (24, 24, 30):
-                draw.rectangle([px, py, px + char_width, py + char_height], fill=bg)
-                
-            if char and char != " ":
-                draw.text((px, py), char, fill=fg, font=font)
-                
+    # Terminal cells
+    for row in range(rows):
+        cells = screen.buffer[row]
+        for col in range(cols):
+            cell = cells[col]
+            fg = resolve(cell.fg)
+            bg = resolve(cell.bg, is_bg=True)
+            px = pad_x + col * cw
+            py = bar_h + pad_y + row * ch
+
+            if bg != BG:
+                draw.rectangle([px, py, px + cw, py + ch], fill=bg)
+
+            ch_str = cell.data
+            if cell.bold:
+                fg = tuple(min(255, c + 40) for c in fg)
+            if ch_str and ch_str != " ":
+                draw.text((px, py), ch_str, fill=fg, font=font)
+
     return img
 
-def main():
-    cast_path = "/home/zenhor/Masaüstü/proje2/demo.cast"
-    output_mp4 = "/home/zenhor/Masaüstü/proje2/omnidb_tui_launch_demo.mp4"
-    
-    print(f"🎬 Processing {cast_path}...")
-    
+
+def cast_to_mp4(cast_path, mp4_path, fps=12, font_size=15, char_w=9, char_h=20):
+    print(f"🎬  Input : {cast_path}")
+    print(f"📹  Output: {mp4_path}")
+
     with open(cast_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
-        
-    # Force the display resolution to match the 120x35 PTY window size
-    cols = 120
-    rows = 35
-    
+
+    header = json.loads(lines[0])
+    cols   = header.get("width",  header.get("term", {}).get("cols", 140))
+    rows   = header.get("height", header.get("term", {}).get("rows", 38))
+
     screen = pyte.Screen(cols, rows)
-    screen.resize(rows, cols)
     stream = pyte.Stream(screen)
-    
-    font = get_font()
-    
-    # Target framerate of 15 fps.
-    fps = 15
-    frame_duration = 1.0 / fps
-    
+    font   = get_font(font_size)
+
+    bar_h  = 36
+    pad_x, pad_y = 12, 10
+    img_w  = cols * char_w + pad_x * 2
+    img_h  = rows * char_h + pad_y * 2 + bar_h
+
     ffmpeg_cmd = [
         "ffmpeg", "-y",
         "-f", "image2pipe",
@@ -127,70 +142,66 @@ def main():
         "-i", "-",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        "-crf", "18",
-        output_mp4
+        "-crf", "16",
+        "-preset", "slow",
+        mp4_path
     ]
-    
-    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
-    
-    # Parse events chronologically with accumulated absolute timestamps
+    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     events = []
-    current_abs_time = 0.0
     for line in lines[1:]:
-        if not line.strip():
+        line = line.strip()
+        if not line:
             continue
         try:
-            event = json.loads(line)
-            if len(event) >= 3 and event[1] == "o":
-                delta = float(event[0])
-                current_abs_time += delta
-                events.append((current_abs_time, event[2]))
+            ev = json.loads(line)
+            if len(ev) >= 3 and ev[1] == "o":
+                events.append((float(ev[0]), ev[2]))
         except Exception:
             pass
-            
-    # Sort events by timestamp
-    events.sort(key=lambda x: x[0])
-    
+
     if not events:
-        print("No output events found!")
+        print("⚠️  No events found in cast file.")
+        proc.stdin.close()
+        proc.wait()
         return
 
-    # Re-normalize timestamps
-    reordered_events = []
-    t0 = events[0][0]
+    frame_count = 0
+    prev_t = 0.0
+    spf = 1.0 / fps  # seconds per frame
+
     for ts, data in events:
-        reordered_events.append((ts - t0, data))
-            
-    # Simulate the playback at 15 fps
-    total_duration = reordered_events[-1][0]
-    total_frames = int(total_duration * fps) + 30 # extra 2 seconds at the end
-    
-    print(f"📹 Rendering {total_frames} frames ({total_duration:.2f}s) to high-definition MP4...")
-    
-    event_idx = 0
-    for frame_num in range(total_frames):
-        target_time = frame_num * frame_duration
-        
-        # Feed all events that happened up to this target time
-        while event_idx < len(reordered_events) and reordered_events[event_idx][0] <= target_time:
-            stream.feed(reordered_events[event_idx][1])
-            event_idx += 1
-            
-        img = render_screen_to_image(screen, font, cols=cols, rows=rows)
+        stream.feed(data)
+        elapsed = ts - prev_t
+        # How many frames to hold for this interval?
+        n_frames = max(1, round(elapsed / spf))
+        img = render_frame(screen, font, char_w, char_h, cols, rows)
+        for _ in range(n_frames):
+            img.save(proc.stdin, format="PNG")
+            frame_count += 1
+
+        prev_t = ts
+        if frame_count % 50 == 0:
+            print(f"   ↳ {frame_count} frames rendered …", flush=True)
+
+    # Hold last frame for 2 extra seconds
+    img = render_frame(screen, font, char_w, char_h, cols, rows)
+    for _ in range(fps * 2):
         img.save(proc.stdin, format="PNG")
-        
-        if frame_num % 50 == 0:
-            print(f"   Rendered {frame_num}/{total_frames} frames...")
-            
+        frame_count += 1
+
     proc.stdin.close()
     proc.wait()
-    
-    if os.path.exists(output_mp4) and os.path.getsize(output_mp4) > 1000:
-        print(f"\n🎉 SUCCESS! Ultra-high quality MP4 video generated successfully!")
-        print(f"   Output MP4: {output_mp4}")
-        print(f"   Size: {os.path.getsize(output_mp4) / 1024 / 1024:.2f} MB")
+
+    size = os.path.getsize(mp4_path) if os.path.exists(mp4_path) else 0
+    if size > 1000:
+        print(f"\n✅  Done!  {frame_count} frames → {mp4_path}  ({size/1024/1024:.2f} MB)")
     else:
-        print("\n❌ Failed to generate MP4.")
+        print(f"\n❌  Failed — output is only {size} bytes")
+
 
 if __name__ == "__main__":
-    main()
+    cast_path = sys.argv[1] if len(sys.argv) > 1 else "demo.cast"
+    mp4_path  = sys.argv[2] if len(sys.argv) > 2 else cast_path.replace(".cast", ".mp4")
+    cast_to_mp4(cast_path, mp4_path)
