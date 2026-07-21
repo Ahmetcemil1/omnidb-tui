@@ -974,38 +974,42 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
         return Ok(false);
     }
 
-    // Ctrl + R or Ctrl + Enter -> Run custom SQL query
+fn execute_active_tab_query(app: &mut App, tab_idx: usize, tx: Sender<AppEvent>) {
+    let tab = &mut app.tabs[tab_idx];
+    if matches!(tab.selected_view, ViewMode::Query) {
+        let sql = tab.query_editor_content.clone();
+        if !sql.trim().is_empty() {
+            app.pending_query = true;
+            log_history(&sql);
+            app.query_history.push(sql.replace('\n', " "));
+            
+            if tab.db_type == DbType::Solana {
+                let uri_clone = tab.connection_uri.clone();
+                tokio::spawn(run_solana_query(tab_idx, uri_clone, sql, tx.clone()));
+            } else if tab.db_type == DbType::Redis {
+                let uri_clone = tab.connection_uri.clone();
+                tokio::spawn(run_redis_query(tab_idx, uri_clone, sql, tx.clone()));
+            } else if tab.db_type == DbType::Mongo {
+                let uri_clone = tab.connection_uri.clone();
+                tokio::spawn(run_mongo_query(tab_idx, uri_clone, sql, tx.clone()));
+            } else if tab.db_type == DbType::Ethereum {
+                let uri_clone = tab.connection_uri.clone();
+                tokio::spawn(run_ethereum_query(tab_idx, uri_clone, sql, tx.clone()));
+            } else if let Some(pool) = &tab.connection_pool {
+                let pool_clone = pool.clone();
+                tokio::spawn(run_query(tab_idx, pool_clone, sql, tx.clone()));
+            } else {
+                app.pending_query = false;
+            }
+        }
+    }
+}
+
+    // Ctrl + R or Ctrl + Enter -> Run custom SQL query / command
     if (key.code == KeyCode::Char('r') && key.modifiers.contains(KeyModifiers::CONTROL))
         || (key.code == KeyCode::Enter && key.modifiers.contains(KeyModifiers::CONTROL))
     {
-        let tab = &mut app.tabs[tab_idx];
-        if matches!(tab.selected_view, ViewMode::Query) {
-            let sql = tab.query_editor_content.clone();
-            if !sql.trim().is_empty() {
-                app.pending_query = true;
-                log_history(&sql);
-                app.query_history.push(sql.replace('\n', " "));
-                
-                if tab.db_type == DbType::Solana {
-                    let uri_clone = tab.connection_uri.clone();
-                    tokio::spawn(run_solana_query(tab_idx, uri_clone, sql, tx.clone()));
-                } else if tab.db_type == DbType::Redis {
-                    let uri_clone = tab.connection_uri.clone();
-                    tokio::spawn(run_redis_query(tab_idx, uri_clone, sql, tx.clone()));
-                } else if tab.db_type == DbType::Mongo {
-                    let uri_clone = tab.connection_uri.clone();
-                    tokio::spawn(run_mongo_query(tab_idx, uri_clone, sql, tx.clone()));
-                } else if tab.db_type == DbType::Ethereum {
-                    let uri_clone = tab.connection_uri.clone();
-                    tokio::spawn(run_ethereum_query(tab_idx, uri_clone, sql, tx.clone()));
-                } else if let Some(pool) = &tab.connection_pool {
-                    let pool_clone = pool.clone();
-                    tokio::spawn(run_query(tab_idx, pool_clone, sql, tx.clone()));
-                } else {
-                    app.pending_query = false;
-                }
-            }
-        }
+        execute_active_tab_query(app, tab_idx, tx.clone());
         return Ok(false);
     }
 
@@ -1248,7 +1252,7 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                     if let Some(ref table) = tab.active_table {
                         if tab.db_type == DbType::Solana {
                             let template = match table.as_str() {
-                                "Account Info" => "vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR".to_string(),
+                                "Account Info" => "11111111111111111111111111111111".to_string(),
                                 "Recent Transactions" => "history vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR".to_string(),
                                 "Borsh IDL Parser" => "idl ./path_to_idl.json vines1Yue2Cx6GPJ8zb8T27221KszrrK46j35cSL2uR MyAccountStruct".to_string(),
                                 _ => "".to_string(),
@@ -1266,7 +1270,11 @@ async fn handle_key_input(app: &mut App, key: KeyEvent, tx: Sender<AppEvent>) ->
                     }
                 }
                 ViewMode::Query => {
-                    tab.query_editor_content.push('\n');
+                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                        tab.query_editor_content.push('\n');
+                    } else {
+                        execute_active_tab_query(app, tab_idx, tx.clone());
+                    }
                 }
                 _ => {}
             }
